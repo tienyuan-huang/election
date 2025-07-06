@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2024 台灣立委選舉結果視覺化</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Chart.js for Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* 使用 Noto Sans TC 作為主要字體 */
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+        /* Leaflet 地圖容器的高度 */
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 10;
+        }
+        /* 自定義 Leaflet 標記圖標樣式 */
+        .leaflet-div-icon {
+            background: transparent;
+            border: none;
+        }
+        /* 讓滾動條更好看 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="flex flex-col md:flex-row h-screen w-screen overflow-hidden">
+
+        <!-- 左側地圖區塊 -->
+        <div class="w-full md:w-2/3 h-1/2 md:h-full relative">
+            <div id="map"></div>
+            <!-- 圖例 -->
+            <div class="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-lg z-20">
+                <h3 class="font-bold text-sm mb-2">選情激烈度</h3>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #ef4444;"></div><span class="text-xs">激烈選區 (差距 < 5%)</span></div>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #a78bfa;"></div><span class="text-xs">競爭選區 (差距 5%-15%)</span></div>
+                <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #2563eb;"></div><span class="text-xs">穩定領先 (差距 > 15%)</span></div>
+            </div>
+        </div>
+
+        <!-- 右側資訊及列表區塊 -->
+        <div class="w-full md:w-1/3 h-1/2 md:h-full flex flex-col bg-white shadow-lg">
+            
+            <!-- 選區詳細資訊 -->
+            <div id="info-panel" class="p-4 border-b border-gray-200">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">請選擇一個選區</h2>
+                <p class="text-gray-500">點擊地圖上的標記或右側列表來查看詳細資訊。</p>
+            </div>
+
+            <!-- 選區列表 -->
+            <div id="district-list" class="flex-grow overflow-y-auto">
+                <!-- 列表項目將由 JavaScript 動態生成 -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 鑲嵌的選舉資料
+        const electionData = [
+            { "type": "立委", "district": "新北市1", "winner": "洪孟楷", "winner_votes": 158596, "opponent_votes": 106454, "total_votes": 387636, "areas": "石門區、三芝區、淡水區、八里區、林口區、泰山區", "coords": [25.1745, 121.4455] },
+            { "type": "立委", "district": "台中市5", "winner": "黃健豪", "winner_votes": 134706, "opponent_votes": 107357, "total_votes": 363228, "areas": "北區、北屯區", "coords": [24.1794, 120.6947] },
+            { "type": "立委", "district": "新北市11", "winner": "羅明才", "winner_votes": 123399, "opponent_votes": 76237, "total_votes": 296636, "areas": "新店區、深坑區、石碇區、坪林區、烏來區", "coords": [24.9772, 121.5386] },
+            { "type": "立委", "district": "台中市4", "winner": "廖偉翔", "winner_votes": 119740, "opponent_votes": 113350, "total_votes": 329204, "areas": "西屯區、南屯區", "coords": [24.1632, 120.6400] },
+            { "type": "立委", "district": "桃園市4", "winner": "萬美玲", "winner_votes": 119430, "opponent_votes": 83183, "total_votes": 302324, "areas": "桃園區", "coords": [24.9936, 121.3168] },
+            { "type": "立委", "district": "台中市2", "winner": "顏寬恒", "winner_votes": 118962, "opponent_votes": 96151, "total_votes": 302780, "areas": "沙鹿區、龍井區、大肚區、烏日區、霧峰區", "coords": [24.1863, 120.5779] },
+            { "type": "立委", "district": "桃園市1", "winner": "牛煦庭", "winner_votes": 116571, "opponent_votes": 103466, "total_votes": 339560, "areas": "龜山區、蘆竹區、桃園區(15里)", "coords": [25.0479, 121.3721] },
+            { "type": "立委", "district": "台北市4", "winner": "李彦秀", "winner_votes": 112743, "opponent_votes": 95241, "total_votes": 318088, "areas": "內湖區、南港區", "coords": [25.0568, 121.6154] },
+            { "type": "立委", "district": "台中市3", "winner": "楊瓊瓔", "winner_votes": 106306, "opponent_votes": 80128, "total_votes": 260252, "areas": "后里區、神岡區、大雅區、潭子區", "coords": [24.2493, 120.7000] },
+            { "type": "立委", "district": "台北市3", "winner": "王鴻薇", "winner_votes": 105050, "opponent_votes": 89850, "total_votes": 277328, "areas": "中山區、松山區(20里)", "coords": [25.0521, 121.5422] },
+            { "type": "立委", "district": "桃園市2", "winner": "涂權吉", "winner_votes": 103697, "opponent_votes": 102468, "total_votes": 308720, "areas": "大園區、觀音區、新屋區、楊梅區", "coords": [24.9912, 121.1554] },
+            { "type": "立委", "district": "台中市6", "winner": "羅廷瑋", "winner_votes": 103630, "opponent_votes": 88674, "total_votes": 273368, "areas": "中區、西區、東區、南區", "coords": [24.1374, 120.6869] },
+            { "type": "立委", "district": "桃園市3", "winner": "魯明哲", "winner_votes": 102056, "opponent_votes": 95581, "total_votes": 301216, "areas": "中壢區(73里)", "coords": [24.9583, 121.2256] },
+            { "type": "立委", "district": "新北市9", "winner": "林德福", "winner_votes": 98260, "opponent_votes": 50613, "total_votes": 238300, "areas": "永和區、中和區(17里)", "coords": [25.0094, 121.5150] },
+            { "type": "立委", "district": "彰化縣3", "winner": "謝衣鳳", "winner_votes": 97681, "opponent_votes": 78473, "total_votes": 267188, "areas": "芳苑鄉、二林鎮、埔鹽鄉、溪湖鎮、埔心鄉、大城鄉、竹塘鄉、埤頭鄉、北斗鎮、溪州鄉", "coords": [23.9056, 120.4422] },
+            { "type": "立委", "district": "新北市12", "winner": "廖先翔", "winner_votes": 92489, "opponent_votes": 81937, "total_votes": 265112, "areas": "汐止區、金山區、萬里區、瑞芳區、平溪區、雙溪區、貢寮區", "coords": [25.0721, 121.6638] },
+            { "type": "立委", "district": "新竹市1", "winner": "鄭正鈐", "winner_votes": 92014, "opponent_votes": 83298, "total_votes": 354648, "areas": "東區、北區、香山區", "coords": [24.8039, 120.9687] },
+            { "type": "立委", "district": "基隆市1", "winner": "林沛祥", "winner_votes": 91986, "opponent_votes": 69741, "total_votes": 303940, "areas": "中正區、七堵區、暖暖區、仁愛區、中山區、安樂區、信義區", "coords": [25.1283, 121.7419] },
+            { "type": "立委", "district": "新北市8", "winner": "張智倫", "winner_votes": 89808, "opponent_votes": 77763, "total_votes": 287652, "areas": "中和區(76里)", "coords": [25.0000, 121.4850] },
+            { "type": "立委", "district": "台北市7", "winner": "徐巧芯", "winner_votes": 89727, "opponent_votes": 76113, "total_votes": 234816, "areas": "信義區、松山區(13里)", "coords": [25.0330, 121.5654] },
+            { "type": "立委", "district": "桃園市5", "winner": "呂玉玲", "winner_votes": 89372, "opponent_votes": 69022, "total_votes": 280636, "areas": "平鎮區、龍潭區", "coords": [24.8624, 121.2144] },
+            { "type": "立委", "district": "苗栗縣2", "winner": "邱鎮軍", "winner_votes": 89111, "opponent_votes": 72749, "total_votes": 167088, "areas": "頭份市、三灣鄉、南庄鄉、苗栗市、頭屋鄉、獅潭鄉、公館鄉、大湖鄉、泰安鄉、卓蘭鎮", "coords": [24.5647, 120.8175] },
+            { "type": "立委", "district": "台中市8", "winner": "江啟臣", "winner_votes": 88651, "opponent_votes": 64542, "total_votes": 210596, "areas": "豐原區、石岡區、新社、東勢區、和平區", "coords": [24.2581, 120.8203] },
+            { "type": "立委", "district": "台北市6", "winner": "羅智強", "winner_votes": 87973, "opponent_votes": 74375, "total_votes": 233124, "areas": "大安區", "coords": [25.0250, 121.5433] },
+            { "type": "立委", "district": "台北市8", "winner": "賴士葆", "winner_votes": 87099, "opponent_votes": 59490, "total_votes": 248320, "areas": "文山區、中正區(10里)", "coords": [24.9882, 121.5598] },
+            { "type": "立委", "district": "新竹縣1", "winner": "徐欣瑩", "winner_votes": 84959, "opponent_votes": 45445, "total_votes": 215268, "areas": "新豐鄉、湖口鄉、新埔鎮、芎林鄉、關西鎮、尖石鄉、竹北市(12里)", "coords": [24.8756, 121.0962] },
+            { "type": "立委", "district": "雲林縣1", "winner": "丁學忠", "winner_votes": 84736, "opponent_votes": 81707, "total_votes": 275008, "areas": "麥寮鄉、臺西鄉、東勢鄉、褒忠鄉、土庫鎮、虎尾鎮、四湖鄉、元長鄉、口湖鄉、水林鄉、北港鎮", "coords": [23.7557, 120.2520] },
+            { "type": "立委", "district": "桃園市6", "winner": "邱若華", "winner_votes": 81513, "opponent_votes": 76346, "total_votes": 282216, "areas": "八德區、大溪區、復興區、中壢區(12里)", "coords": [24.9125, 121.3188] },
+            { "type": "立委", "district": "苗栗縣1", "winner": "陳超明", "winner_votes": 79521, "opponent_votes": 60358, "total_votes": 147448, "areas": "竹南鎮、後龍鎮、造橋鄉、西湖鄉、通霄鎮、銅鑼鄉、三義鄉、苑裡鎮", "coords": [24.5986, 120.7220] },
+            { "type": "立委", "district": "新北市7", "winner": "葉元之", "winner_votes": 78134, "opponent_votes": 75841, "total_votes": 233124, "areas": "板橋區東側(61里)", "coords": [25.0142, 121.4678] },
+            { "type": "立委", "district": "新竹縣2", "winner": "林思銘", "winner_votes": 76608, "opponent_votes": 63566, "total_votes": 232868, "areas": "竹東鎮、寶山鄉、北埔鄉、峨眉鄉、橫山鄉、五峰鄉、竹北市(19里)", "coords": [24.7381, 121.0886] },
+            { "type": "立委", "district": "南投縣2", "winner": "游顥", "winner_votes": 70012, "opponent_votes": 66551, "total_votes": 198328, "areas": "南投市、名間鄉、集集鎮、竹山鎮、鹿谷鄉、水里鄉、信義鄉", "coords": [23.8340, 120.8878] },
+            { "type": "立委", "district": "南投縣1", "winner": "馬文君", "winner_votes": 68890, "opponent_votes": 50886, "total_votes": 186220, "areas": "埔里鎮、草屯鎮、中寮鄉、魚池鄉、國姓鄉、仁愛鄉", "coords": [23.9675, 120.9698] },
+            { "type": "立委", "district": "花蓮縣1", "winner": "傅崐萁", "winner_votes": 68786, "opponent_votes": 51732, "total_votes": 193768, "areas": "花蓮市、鳳林鎮、玉里鎮、新城鄉、吉安鄉、壽豐鄉、光復鄉、豐濱鄉、瑞穗鄉、富里鄉、秀林鄉、萬榮鄉、卓溪鄉", "coords": [23.9871, 121.6016] },
+            { "type": "立委", "district": "台東縣1", "winner": "黃建賓", "winner_votes": 25778, "opponent_votes": 23420, "total_votes": 115336, "areas": "臺東市、成功鎮、關山鎮、卑南鄉、鹿野鄉、池上鄉、東河鄉、長濱鄉、太麻里鄉、大武鄉、綠島鄉、海端鄉、延平鄉、金峰鄉、達仁鄉、蘭嶼鄉", "coords": [22.7586, 121.1444] }
+        ];
+
+        // 初始化地圖
+        const map = L.map('map').setView([23.9738, 120.982], 7.5); // 台灣中心點
+
+        // 加入 CartoDB Positron 圖層 (樸素風格)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        }).addTo(map);
+
+        const infoPanel = document.getElementById('info-panel');
+        const districtList = document.getElementById('district-list');
+        let voteChart = null; // 用於存放 Chart.js 實例
+
+        // 根據差距百分比決定顏色
+        function getColor(percentage) {
+            if (percentage < 0.05) return '#ef4444'; // 紅色 (激烈)
+            if (percentage < 0.15) return '#a78bfa'; // 淺紫色 (競爭)
+            return '#2563eb'; // 深藍色 (穩定)
+        }
+
+        // 更新右側資訊面板
+        function updateInfoPanel(data) {
+            const winnerPercentage = (data.winner_votes / data.total_votes * 100).toFixed(2);
+            const opponentPercentage = (data.opponent_votes / data.total_votes * 100).toFixed(2);
+
+            infoPanel.innerHTML = `
+                <h2 class="text-2xl font-bold text-gray-800 mb-1">${data.district}</h2>
+                <p class="text-sm text-gray-500 mb-4">對應行政區：${data.areas}</p>
+                
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-semibold text-blue-600">當選者: ${data.winner}</span>
+                        <span class="text-lg font-bold text-blue-600">${data.winner_votes.toLocaleString()} 票</span>
+                    </div>
+                     <div class="flex justify-between items-center text-sm text-gray-600">
+                        <span>催票率</span>
+                        <span>${winnerPercentage}%</span>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-semibold text-green-600">主要對手</span>
+                         <span class="text-lg font-bold text-green-600">${data.opponent_votes.toLocaleString()} 票</span>
+                    </div>
+                     <div class="flex justify-between items-center text-sm text-gray-600">
+                        <span>催票率</span>
+                        <span>${opponentPercentage}%</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 h-48">
+                    <canvas id="vote-chart"></canvas>
+                </div>
+            `;
+
+            // 繪製或更新圖表
+            const ctx = document.getElementById('vote-chart').getContext('2d');
+            if (voteChart) {
+                voteChart.destroy();
+            }
+            voteChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [data.winner, '主要對手'],
+                    datasets: [{
+                        label: '得票數',
+                        data: [data.winner_votes, data.opponent_votes],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.7)',  // Blue for winner
+                            'rgba(34, 197, 94, 0.7)'    // Green for opponent
+                        ],
+                        borderColor: [
+                            'rgba(37, 99, 235, 1)',     // Blue for winner
+                            'rgba(22, 163, 74, 1)'      // Green for opponent
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 處理點擊事件
+        function onDistrictSelect(data) {
+            updateInfoPanel(data);
+            map.setView(data.coords, 10); // 將地圖視圖移至選定選區
+        }
+
+        // 遍歷資料，生成地圖標記和列表項目
+        electionData.forEach(data => {
+            // 計算差距
+            const margin = data.winner_votes - data.opponent_votes;
+            const totalValidVotes = data.winner_votes + data.opponent_votes;
+            const marginPercentage = margin / totalValidVotes;
+            const color = getColor(marginPercentage);
+            const animationClass = color === '#ef4444' ? 'animate-pulse' : '';
+
+            // 創建自定義圖標
+            const icon = L.divIcon({
+                className: 'leaflet-div-icon',
+                html: `<div style="background-color:${color};" class="w-5 h-5 rounded-full border-2 border-white shadow-md ${animationClass}"></div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            // 在地圖上添加標記
+            const marker = L.marker(data.coords, { icon: icon }).addTo(map);
+            marker.bindTooltip(`${data.district}<br>當選者: ${data.winner}`, {
+                permanent: false, 
+                direction: 'top',
+                offset: [0, -10]
+            });
+            marker.on('click', () => onDistrictSelect(data));
+
+            // 生成右側列表項目
+            const listItem = document.createElement('div');
+            listItem.className = 'p-4 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors duration-200';
+            listItem.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-semibold">${data.district}</h3>
+                        <p class="text-sm text-gray-600">當選者: ${data.winner}</p>
+                    </div>
+                    <div class="w-4 h-4 rounded-full" style="background-color: ${color};"></div>
+                </div>
+            `;
+            listItem.addEventListener('click', () => onDistrictSelect(data));
+            districtList.appendChild(listItem);
+        });
+
+    </script>
+</body>
+</html>

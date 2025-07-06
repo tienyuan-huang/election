@@ -1,0 +1,29 @@
+/* 使用 Noto Sans TC 作為主要字體 */
+body {
+    font-family: 'Inter', 'Noto Sans TC', sans-serif;
+}
+/* Leaflet 地圖容器的高度 */
+#map {
+    height: 100%;
+    width: 100%;
+    z-index: 10;
+}
+/* 自定義 Leaflet 標記圖標樣式 */
+.leaflet-div-icon {
+    background: transparent;
+    border: none;
+}
+/* 讓滾動條更好看 */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

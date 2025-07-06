@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2024 台灣立委選舉結果視覺化</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Chart.js for Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="flex flex-col md:flex-row h-screen w-screen overflow-hidden">
+
+        <!-- 左側地圖區塊 -->
+        <div class="w-full md:w-2/3 h-1/2 md:h-full relative">
+            <div id="map"></div>
+            <!-- 圖例 -->
+            <div class="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-lg z-20">
+                <h3 class="font-bold text-sm mb-2">選情激烈度</h3>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #ef4444;"></div><span class="text-xs">激烈選區 (差距 < 5%)</span></div>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #a78bfa;"></div><span class="text-xs">競爭選區 (差距 5%-15%)</span></div>
+                <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #2563eb;"></div><span class="text-xs">穩定領先 (差距 > 15%)</span></div>
+            </div>
+        </div>
+
+        <!-- 右側資訊及列表區塊 -->
+        <div class="w-full md:w-1/3 h-1/2 md:h-full flex flex-col bg-white shadow-lg">
+            
+            <!-- 選區詳細資訊 -->
+            <div id="info-panel" class="p-4 border-b border-gray-200">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">請選擇一個選區</h2>
+                <p class="text-gray-500">點擊地圖上的標記或右側列表來查看詳細資訊。</p>
+            </div>
+
+            <!-- 選區列表 -->
+            <div id="district-list" class="flex-grow overflow-y-auto">
+                <!-- 列表項目將由 JavaScript 動態生成 -->
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
