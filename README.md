@@ -9,7 +9,7 @@
 
 ## File Structure
 
-- ![](./map_t01.html) - 原始版本
+- [`./map_t01.html`](./map_t01.html) - 原始版本
 - source code
   - [`./election_data.csv`](./election_data.csv) - 後續的 geo data 可以參考此格式，以利與目前的網頁對接
   - [`./script.js`](./script.js)
