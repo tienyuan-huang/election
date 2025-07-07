@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台灣選舉地圖視覺化</title>
+    <title>拉票罷免小工具</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -34,6 +34,12 @@
             <!-- 控制項面板 -->
             <div class="absolute top-4 left-4 bg-white bg-opacity-90 p-3 rounded-lg shadow-lg z-20 flex flex-col space-y-2">
                 <div>
+                    <label for="district-selector" class="block text-sm font-medium text-gray-700 mb-1">篩選選區</label>
+                    <select id="district-selector" name="district-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <!-- 選項將由 JavaScript 動態生成 -->
+                    </select>
+                </div>
+                <div>
                     <label for="year-selector" class="block text-sm font-medium text-gray-700 mb-1">選擇年份</label>
                     <select id="year-selector" name="year-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                         <option value="2024" selected>2024 立委選舉</option>
@@ -42,34 +48,73 @@
                         <option value="2012">2012 立委選舉</option>
                     </select>
                 </div>
-                <div>
-                    <label for="district-selector" class="block text-sm font-medium text-gray-700 mb-1">篩選選區</label>
-                    <select id="district-selector" name="district-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="all">所有選區</option>
-                        <!-- 選項將由 JavaScript 動態生成 -->
-                    </select>
+                <!-- *** 新增：查看說明按鈕 *** -->
+                <div class="pt-2 mt-1 border-t border-gray-200">
+                     <button id="show-help-btn" class="w-full text-sm text-indigo-600 hover:text-indigo-800 hover:underline focus:outline-none text-center">
+                        查看操作說明
+                    </button>
                 </div>
             </div>
 
             <!-- 圖例 -->
             <div class="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-lg z-20">
-                <h3 class="font-bold text-sm mb-2">村里選情激烈度</h3>
-                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #ef4444;"></div><span class="text-xs">激烈選區 (差距 &lt; 5%)</span></div>
-                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #a78bfa;"></div><span class="text-xs">競爭選區 (差距 5%-15%)</span></div>
-                <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #2563eb;"></div><span class="text-xs">穩定領先 (差距 &gt; 15%)</span></div>
+                <h3 class="font-bold text-sm mb-2">村里政黨傾向</h3>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #3b82f6;"></div><span class="text-xs">中國國民黨領先</span></div>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #16a34a;"></div><span class="text-xs">非國民黨領先</span></div>
+                <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #ef4444;"></div><span class="text-xs">激戰區 (催票率差距 &lt; 5%)</span></div>
             </div>
         </div>
 
-        <!-- 右側資訊區塊 (已移除列表) -->
+        <!-- 右側資訊區塊 -->
         <div class="w-full md:w-1/3 h-1/2 md:h-full flex flex-col bg-white shadow-lg overflow-y-auto">
             
-            <!-- 選區/村里詳細資訊 -->
-            <div id="info-panel" class="flex-grow">
+            <!-- 選舉資訊面板 -->
+            <div id="info-panel" class="flex-shrink-0">
                 <!-- 內容將由 JavaScript 動態生成 -->
             </div>
 
+            <!-- 標註管理面板 -->
+            <div id="annotation-manager" class="flex-grow p-4 border-t border-gray-200 flex flex-col">
+                <h3 class="text-lg font-bold text-gray-800 mb-2">我的標註</h3>
+                <div class="flex space-x-2 mb-3">
+                    <button id="export-csv-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded text-sm">匯出 CSV</button>
+                    <button id="export-kml-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm">匯出 KML</button>
+                </div>
+                <div id="annotation-list" class="flex-grow overflow-y-auto bg-gray-50 rounded p-2">
+                    <!-- 標註列表將由 JavaScript 動態生成 -->
+                </div>
+            </div>
+
         </div>
 
+    </div>
+
+    <!-- 歡迎視窗 -->
+    <div id="welcome-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-xl leading-6 font-medium text-gray-900">歡迎使用罷免案選情分析工具</h3>
+                <div class="mt-4 px-4 py-3 text-left text-sm text-gray-700 space-y-4">
+                    <p>本地圖工具旨在協助罷免志工，透過視覺化分析各選區近年選舉資料，以利規劃溝通策略與催票範圍。</p>
+                    <p>
+                        地圖顏色代表該村里在該次選舉中的政黨傾向：
+                    </p>
+                    <ul class="list-disc list-inside space-y-2">
+                        <li><span class="pb-0.5 border-b-2 border-blue-400">標示藍色區域</span>：代表該村里的投票結果由中國國民黨候選人，取得 5% 以上的催票率優勢。</li>
+                        <li><span class="pb-0.5 border-b-2 border-red-500">標示紅色區域</span>：代表中國國民黨與主要競爭者之間，催票率差距在 5% 以內，屬於激戰區。</li>
+                        <li><span class="pb-0.5 border-b-2 border-green-500">標示綠色區域</span>：代表主要競爭者在該次選舉中，取得 5% 以上的催票率優勢。此處不必然代表該競爭者為民主進步黨籍。</li>
+                    </ul>
+                    <p>
+                        此處採用的關鍵指標為「催票率」，其計算方式為「候選人得票數／該區總選舉人數」。相較於「得票率」，此指標更能有效地觀測相同政治勢力在不同年份、不同投票率下的基礎支持度變化。關於催票率的進一步探討，可參考<a href="https://whogovernstw.org/2020/01/17/kohuayap2/" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">此篇文章</a>。
+                    </p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="close-welcome-modal-btn" class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        我瞭解了，開始使用
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- JavaScript Libraries -->
