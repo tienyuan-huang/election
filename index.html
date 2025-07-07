@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2024 台灣立委選舉結果視覺化</title>
+    <title>台灣選舉地圖視覺化</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,6 +20,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 
+    <!-- Custom Styles -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -29,33 +30,53 @@
         <!-- 左側地圖區塊 -->
         <div class="w-full md:w-2/3 h-1/2 md:h-full relative">
             <div id="map"></div>
+            
+            <!-- 控制項面板 -->
+            <div class="absolute top-4 left-4 bg-white bg-opacity-90 p-3 rounded-lg shadow-lg z-20 flex flex-col space-y-2">
+                <div>
+                    <label for="year-selector" class="block text-sm font-medium text-gray-700 mb-1">選擇年份</label>
+                    <select id="year-selector" name="year-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="2024" selected>2024 立委選舉</option>
+                        <option value="2020">2020 立委選舉</option>
+                        <option value="2016">2016 立委選舉</option>
+                        <option value="2012">2012 立委選舉</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="district-selector" class="block text-sm font-medium text-gray-700 mb-1">篩選選區</label>
+                    <select id="district-selector" name="district-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="all">所有選區</option>
+                        <!-- 選項將由 JavaScript 動態生成 -->
+                    </select>
+                </div>
+            </div>
+
             <!-- 圖例 -->
             <div class="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-lg z-20">
-                <h3 class="font-bold text-sm mb-2">選情激烈度</h3>
-                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #ef4444;"></div><span class="text-xs">激烈選區 (差距 < 5%)</span></div>
+                <h3 class="font-bold text-sm mb-2">村里選情激烈度</h3>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #ef4444;"></div><span class="text-xs">激烈選區 (差距 &lt; 5%)</span></div>
                 <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #a78bfa;"></div><span class="text-xs">競爭選區 (差距 5%-15%)</span></div>
-                <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #2563eb;"></div><span class="text-xs">穩定領先 (差距 > 15%)</span></div>
+                <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #2563eb;"></div><span class="text-xs">穩定領先 (差距 &gt; 15%)</span></div>
             </div>
         </div>
 
-        <!-- 右側資訊及列表區塊 -->
-        <div class="w-full md:w-1/3 h-1/2 md:h-full flex flex-col bg-white shadow-lg">
+        <!-- 右側資訊區塊 (已移除列表) -->
+        <div class="w-full md:w-1/3 h-1/2 md:h-full flex flex-col bg-white shadow-lg overflow-y-auto">
             
-            <!-- 選區詳細資訊 -->
-            <div id="info-panel" class="p-4 border-b border-gray-200">
-                <h2 class="text-2xl font-bold text-gray-800 mb-2">請選擇一個選區</h2>
-                <p class="text-gray-500">點擊地圖上的標記或右側列表來查看詳細資訊。</p>
+            <!-- 選區/村里詳細資訊 -->
+            <div id="info-panel" class="flex-grow">
+                <!-- 內容將由 JavaScript 動態生成 -->
             </div>
 
-            <!-- 選區列表 -->
-            <div id="district-list" class="flex-grow overflow-y-auto">
-                <!-- 列表項目將由 JavaScript 動態生成 -->
-            </div>
         </div>
 
     </div>
 
+    <!-- JavaScript Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    
+    <!-- Custom Script -->
     <script src="script.js"></script>
+
 </body>
 </html>
