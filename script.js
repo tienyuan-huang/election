@@ -1,16 +1,16 @@
 /**
  * @file script.js
  * @description 台灣選舉地圖視覺化工具的主要腳本。
- * @version 17.0.0
+ * @version 18.0.0
  * @date 2025-07-08
- * * 此版本改善了地圖與圖表的著色方案。
+ * * 此版本新增了選區搜尋功能。
  * 主要改進：
- * 1.  **地圖顏色更新**: 新增民進黨與其他政黨的專屬顏色，使地圖資訊更清晰。
- * 2.  **圖表顏色更新**: 長條圖現在會根據政黨（國民黨、民進黨、其他）顯示不同顏色。
- * 3.  **常數定義**: 新增民進黨的政黨名稱常數，方便管理。
+ * 1.  **新增搜尋功能**: 使用者可透過關鍵字搜尋候選人或行政區，快速篩選選區列表。
+ * 2.  **建立搜尋索引**: 資料處理流程中會建立一個包含多種關鍵字的搜尋索引。
+ * 3.  **介面更新**: 新增搜尋輸入框，並讓選區下拉選單能根據搜尋結果即時更新。
  */
 
-console.log('Running script.js version 17.0.0 with improved color scheme.');
+console.log('Running script.js version 18.0.0 with search functionality.');
 
 // --- 全域變數與設定 ---
 
@@ -21,6 +21,8 @@ let voteChart = null;
 
 let infoToggle, infoContainer, mapContainer, collapsibleContent, toggleText, toggleIconCollapse, toggleIconExpand;
 
+// 新增：搜尋功能相關 DOM 元素
+let searchInput, clearSearchBtn;
 
 let currentGeoData = null;
 let villageResults = {}; 
@@ -30,7 +32,6 @@ let currentSelectedDistrict = 'all';
 
 let annotations = {};
 
-// *** 新增：定義主要政黨名稱常數 ***
 const KMT_PARTY_NAME = '中國國民黨';
 const DPP_PARTY_NAME = '民主進步黨';
 
@@ -71,8 +72,11 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleIconCollapse = document.getElementById('toggle-icon-collapse');
     toggleIconExpand = document.getElementById('toggle-icon-expand');
 
+    // 獲取搜尋相關元素
+    searchInput = document.getElementById('search-input');
+    clearSearchBtn = document.getElementById('clear-search-btn');
+
     initializeMap();
-    populateDistrictFilter();
     setupEventListeners();
     checkAndShowWelcomeModal();
     loadAndDisplayYear(yearSelector.value);
@@ -111,7 +115,37 @@ function setupEventListeners() {
     if(infoToggle) {
         infoToggle.addEventListener('click', toggleInfoPanel);
     }
+
+    // *** 新增：搜尋功能的事件監聽 ***
+    searchInput.addEventListener('input', handleSearch);
+    clearSearchBtn.addEventListener('click', clearSearch);
 }
+
+// --- 搜尋功能函式 ---
+function handleSearch() {
+    const query = searchInput.value.toLowerCase().trim();
+    if (!query) {
+        populateDistrictFilter();
+        return;
+    }
+
+    const matchedDistricts = RECALL_DISTRICTS.filter(districtName => {
+        const districtData = districtResults[districtName];
+        return districtData && districtData.searchableString.toLowerCase().includes(query);
+    });
+
+    populateDistrictFilter(matchedDistricts);
+    // 自動觸發 change 事件以更新地圖
+    districtSelector.dispatchEvent(new Event('change'));
+}
+
+function clearSearch() {
+    searchInput.value = '';
+    populateDistrictFilter();
+    districtSelector.value = 'all'; // 重設為顯示全部
+    districtSelector.dispatchEvent(new Event('change'));
+}
+
 
 // --- 資訊面板收合功能 ---
 function toggleInfoPanel() {
@@ -188,11 +222,12 @@ async function loadAndDisplayYear(year) {
             })
         ]);
         currentGeoData = geoData;
-        const requiredKeys = ['geo_key', 'electoral_district_name', 'candidate_name', 'party_name', 'votes', 'electorate', 'total_votes'];
+        const requiredKeys = ['geo_key', 'electoral_district_name', 'candidate_name', 'party_name', 'votes', 'electorate', 'total_votes', 'county_name', 'township_name'];
         if (!voteDataRows[0] || requiredKeys.some(key => !voteDataRows[0].hasOwnProperty(key))) {
             throw new Error(`CSV 檔案缺少必要欄位，請確認包含: ${requiredKeys.join(', ')}`);
         }
         processVoteData(voteDataRows);
+        populateDistrictFilter(); // 使用完整列表初始化
         renderMapLayers();
     } catch (error) {
         console.error(`[錯誤] 處理 ${year} 年資料時發生嚴重錯誤:`, error);
@@ -207,15 +242,38 @@ function processVoteData(voteData) {
     const recallDistrictSet = new Set(RECALL_DISTRICTS);
     const filteredVoteData = voteData.filter(row => row.electoral_district_name && recallDistrictSet.has(row.electoral_district_name));
     
+    // *** 新增：建立行政區和候選人的索引 ***
+    const districtTownships = {}; // e.g. { "臺北市第01選區": Set("士林區", "北投區") }
+
     filteredVoteData.forEach(row => {
-        const { electoral_district_name, candidate_name, party_name, votes } = row;
+        const { electoral_district_name, candidate_name, party_name, votes, township_name } = row;
         if (!electoral_district_name) return;
-        if (!districtResults[electoral_district_name]) districtResults[electoral_district_name] = { candidates: {} };
+
+        // 建立選區-行政區對照
+        if (!districtTownships[electoral_district_name]) {
+            districtTownships[electoral_district_name] = new Set();
+        }
+        districtTownships[electoral_district_name].add(township_name);
+
+        // 累計候選人票數
+        if (!districtResults[electoral_district_name]) {
+            districtResults[electoral_district_name] = { candidates: {} };
+        }
         const currentVotes = districtResults[electoral_district_name].candidates[candidate_name] || { votes: 0, party: party_name };
         currentVotes.votes += votes || 0;
         districtResults[electoral_district_name].candidates[candidate_name] = currentVotes;
     });
 
+    // *** 新增：為每個選區建立可搜尋的字串 ***
+    for (const districtName in districtResults) {
+        const district = districtResults[districtName];
+        const candidatesString = Object.keys(district.candidates).join(' ');
+        const townshipsString = Array.from(districtTownships[districtName] || []).join(' ');
+        // searchableString 包含：選區名、行政區名、候選人名
+        district.searchableString = `${districtName} ${townshipsString} ${candidatesString}`;
+    }
+
+    // (其餘處理邏輯不變)
     for (const districtName in districtResults) {
         const district = districtResults[districtName];
         const sortedCandidates = Object.entries(district.candidates).sort((a, b) => b[1].votes - a[1].votes);
@@ -255,11 +313,24 @@ function processVoteData(voteData) {
 
 function renderMapLayers() {
     if (geoJsonLayer) map.removeLayer(geoJsonLayer);
+    
+    // 根據選區選擇器決定要顯示哪些村里
+    const selectedDistrict = districtSelector.value;
+    const isMultiSelect = districtSelector.options.length > 2 && selectedDistrict === 'all';
+
     geoJsonLayer = L.geoJSON(currentGeoData, {
         filter: feature => {
             const villCode = feature.properties.VILLCODE;
-            if (!geoKeyToDistrictMap[villCode]) return false;
-            return currentSelectedDistrict === "all" || geoKeyToDistrictMap[villCode] === currentSelectedDistrict;
+            const districtName = geoKeyToDistrictMap[villCode];
+            if (!districtName) return false;
+
+            if (isMultiSelect) {
+                // 如果是多選模式（搜尋結果），則顯示所有符合的選區
+                return Array.from(districtSelector.options).some(opt => opt.value === districtName);
+            } else {
+                // 單選或預設的 "all" 模式
+                return selectedDistrict === "all" || districtName === selectedDistrict;
+            }
         },
         style: feature => {
             const villCode = feature.properties.VILLCODE;
@@ -282,38 +353,66 @@ function renderMapLayers() {
             }
         }
     }).addTo(map);
-    if (geoJsonLayer.getLayers().length > 0) map.fitBounds(geoJsonLayer.getBounds());
+
+    if (geoJsonLayer.getLayers().length > 0) {
+        map.fitBounds(geoJsonLayer.getBounds());
+    }
 }
 
-function populateDistrictFilter() {
-    districtSelector.innerHTML = '<option value="all">所有罷免提案選區</option>';
-    RECALL_DISTRICTS.sort((a, b) => a.localeCompare(b, 'zh-Hant')).forEach(districtName => {
+// *** 修改：讓此函式可以接受要顯示的選區列表 ***
+function populateDistrictFilter(districtsToShow = RECALL_DISTRICTS) {
+    const originalValue = districtSelector.value;
+    districtSelector.innerHTML = ''; // 清空現有選項
+
+    // 根據傳入的列表長度決定是否顯示 "所有..." 選項
+    if (districtsToShow.length > 1) {
+        const allOption = document.createElement('option');
+        allOption.value = "all";
+        allOption.textContent = `所有符合的選區 (${districtsToShow.length})`;
+        districtSelector.appendChild(allOption);
+    } else if (districtsToShow.length === 0) {
+        const noResultOption = document.createElement('option');
+        noResultOption.value = "none";
+        noResultOption.textContent = "無符合的選區";
+        districtSelector.appendChild(noResultOption);
+    }
+
+    // 填充選區選項
+    districtsToShow.sort((a, b) => a.localeCompare(b, 'zh-Hant')).forEach(districtName => {
         const option = document.createElement('option');
         option.value = districtName;
         option.textContent = districtName;
         districtSelector.appendChild(option);
     });
+
+    // 嘗試還原之前的選項，如果還存在的話
+    if (Array.from(districtSelector.options).some(opt => opt.value === originalValue)) {
+        districtSelector.value = originalValue;
+    } else if (districtsToShow.length === 1) {
+        // 如果只有一個結果，就直接選取它
+        districtSelector.value = districtsToShow[0];
+    }
 }
 
-// *** 修改：更新地圖著色邏輯 ***
+
 function getColor(village) {
     if (!village || !village.leader || !village.runnerUp || !village.electorate || village.electorate === 0) {
-        return '#cccccc'; // 無資料或選舉人數為零
+        return '#cccccc';
     }
     const leaderTurnout = village.leader.votes / village.electorate;
     const runnerUpTurnout = village.runnerUp.votes / village.electorate;
     const turnoutDiff = Math.abs(leaderTurnout - runnerUpTurnout);
 
     if (turnoutDiff < 0.05) {
-        return '#ef4444'; // 激戰區
+        return '#ef4444'; 
     }
 
     if (village.leader.party === KMT_PARTY_NAME) {
-        return '#3b82f6'; // 國民黨領先
+        return '#3b82f6';
     } else if (village.leader.party === DPP_PARTY_NAME) {
-        return '#16a34a'; // 民進黨領先
+        return '#16a34a';
     } else {
-        return 'rgba(0, 0, 0, 0.4)'; // 其他政黨/無黨籍領先
+        return 'rgba(0, 0, 0, 0.4)';
     }
 }
 
@@ -384,7 +483,6 @@ function updateInfoPanel(village, layer) {
     if (voteChart) voteChart.destroy();
     const ctx = document.getElementById('vote-chart').getContext('2d');
     
-    // *** 修改：更新圖表著色邏輯 ***
     voteChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -395,12 +493,12 @@ function updateInfoPanel(village, layer) {
                 backgroundColor: village.candidates.map(c => {
                     if (c.party === KMT_PARTY_NAME) return 'rgba(59, 130, 246, 0.7)';
                     if (c.party === DPP_PARTY_NAME) return 'rgba(22, 163, 74, 0.7)';
-                    return 'rgba(128, 128, 128, 0.7)'; // 其他政黨為灰色
+                    return 'rgba(128, 128, 128, 0.7)';
                 }),
                 borderColor: village.candidates.map(c => {
                     if (c.party === KMT_PARTY_NAME) return 'rgba(37, 99, 235, 1)';
                     if (c.party === DPP_PARTY_NAME) return 'rgba(21, 128, 61, 1)';
-                    return 'rgba(107, 114, 128, 1)'; // 其他政黨為灰色
+                    return 'rgba(107, 114, 128, 1)';
                 }),
                 borderWidth: 1
             }]
