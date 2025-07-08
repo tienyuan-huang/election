@@ -1,15 +1,15 @@
 /**
  * @file script.js
  * @description 台灣選舉地圖視覺化工具的主要腳本。
- * @version 13.0.0
+ * @version 16.0.0
  * @date 2025-07-08
- * * 此版本在控制面板新增了手動觸發說明視窗的按鈕。
+ * * 此版本移除了 2012 年的選舉資料。
  * 主要改進：
- * 1.  **手動查看說明**: 使用者可隨時點擊「查看操作說明」按鈕，重新開啟歡迎視窗。
- * 2.  **程式碼重構**: 將顯示與關閉視窗的邏輯重構為獨立函式，使程式碼更清晰。
+ * 1.  **移除 2012 資料**: 從資料來源清單中移除 2012 年的選舉資料。
+ * 2.  **更新介面**: 同步更新了年份選擇器，不再顯示 2012 年選項。
  */
 
-console.log('Running script.js version 13.0.0 with manual help button.');
+console.log('Running script.js version 16.0.0, removed 2012 data.');
 
 // --- 全域變數與設定 ---
 
@@ -17,6 +17,9 @@ let map;
 let geoJsonLayer, annotationLayer;
 let infoPanel, yearSelector, districtSelector, annotationList, exportCsvBtn, exportKmlBtn, showHelpBtn;
 let voteChart = null;
+
+let infoToggle, infoContainer, mapContainer, collapsibleContent, toggleText, toggleIconCollapse, toggleIconExpand;
+
 
 let currentGeoData = null;
 let villageResults = {}; 
@@ -40,11 +43,11 @@ const RECALL_DISTRICTS = [
     '南投縣第02選區', '南投縣第01選區', '花蓮縣第01選區'
 ];
 
+// *** 修改：移除 2012 年的資料來源 ***
 const dataSources = {
     '2024': { votes: 'data/2024/regional_legislator_votes.csv', geo: 'data/village.geojson' },
     '2020': { votes: 'data/2020/regional_legislator_votes.csv', geo: 'data/village.geojson' },
     '2016': { votes: 'data/2016/regional_legislator_votes.csv', geo: 'data/village.geojson' },
-    '2012': { votes: 'data/2012/regional_legislator_votes.csv', geo: 'data/village.geojson' },
 };
 
 // --- 初始化與事件監聽 ---
@@ -58,10 +61,18 @@ document.addEventListener('DOMContentLoaded', function() {
     exportKmlBtn = document.getElementById('export-kml-btn');
     showHelpBtn = document.getElementById('show-help-btn');
 
+    infoToggle = document.getElementById('info-toggle');
+    infoContainer = document.getElementById('info-container');
+    mapContainer = document.getElementById('map-container');
+    collapsibleContent = document.getElementById('collapsible-content');
+    toggleText = document.getElementById('toggle-text');
+    toggleIconCollapse = document.getElementById('toggle-icon-collapse');
+    toggleIconExpand = document.getElementById('toggle-icon-expand');
+
     initializeMap();
     populateDistrictFilter();
     setupEventListeners();
-    checkAndShowWelcomeModal(); // 檢查是否為首次載入
+    checkAndShowWelcomeModal();
     loadAndDisplayYear(yearSelector.value);
     renderAnnotationList();
 });
@@ -84,7 +95,6 @@ function setupEventListeners() {
     exportCsvBtn.addEventListener('click', exportToCSV);
     exportKmlBtn.addEventListener('click', exportToKML);
 
-    // *** 修改：設定歡迎視窗的所有事件監聽 ***
     const modal = document.getElementById('welcome-modal');
     const closeBtn = document.getElementById('close-welcome-modal-btn');
     
@@ -95,9 +105,48 @@ function setupEventListeners() {
             closeWelcomeModal();
         }
     });
+
+    if(infoToggle) {
+        infoToggle.addEventListener('click', toggleInfoPanel);
+    }
 }
 
-// --- *** 新增/修改：歡迎視窗處理函式 *** ---
+// --- 資訊面板收合功能 ---
+function toggleInfoPanel() {
+    const isCollapsed = collapsibleContent.classList.contains('hidden');
+
+    if (isCollapsed) {
+        infoContainer.classList.remove('h-auto');
+        infoContainer.classList.add('h-1/2');
+        mapContainer.classList.remove('h-full');
+        mapContainer.classList.add('h-1/2');
+        collapsibleContent.classList.remove('hidden');
+        
+        toggleText.textContent = '收合資訊面板';
+        toggleIconCollapse.classList.remove('hidden');
+        toggleIconExpand.classList.add('hidden');
+
+    } else {
+        infoContainer.classList.remove('h-1/2');
+        infoContainer.classList.add('h-auto');
+        mapContainer.classList.remove('h-1/2');
+        mapContainer.classList.add('h-full');
+        collapsibleContent.classList.add('hidden');
+
+        toggleText.textContent = '展開資訊面板';
+        toggleIconCollapse.classList.add('hidden');
+        toggleIconExpand.classList.remove('hidden');
+    }
+
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize(true);
+        }
+    }, 500);
+}
+
+
+// --- 歡迎視窗處理函式 ---
 function showWelcomeModal() {
     const modal = document.getElementById('welcome-modal');
     modal.classList.remove('hidden');
@@ -106,19 +155,17 @@ function showWelcomeModal() {
 function closeWelcomeModal() {
     const modal = document.getElementById('welcome-modal');
     modal.classList.add('hidden');
-    // 當使用者手動關閉時，記錄下來，避免下次重整時又跳出
     sessionStorage.setItem('welcomeShown', 'true');
 }
 
 function checkAndShowWelcomeModal() {
-    // 僅在 session storage 中沒有記錄時，才自動顯示
     if (!sessionStorage.getItem('welcomeShown')) {
         showWelcomeModal();
     }
 }
 
 
-// --- 主要資料處理函式 (與前版相同) ---
+// --- 主要資料處理函式 ---
 async function loadAndDisplayYear(year) {
     const source = dataSources[year];
     if (!source) return console.error(`找不到 ${year} 年的資料來源設定。`);
@@ -139,7 +186,7 @@ async function loadAndDisplayYear(year) {
             })
         ]);
         currentGeoData = geoData;
-        const requiredKeys = ['geo_key', 'electoral_district_name', 'candidate_name', 'party_name', 'votes', 'electorate'];
+        const requiredKeys = ['geo_key', 'electoral_district_name', 'candidate_name', 'party_name', 'votes', 'electorate', 'total_votes'];
         if (!voteDataRows[0] || requiredKeys.some(key => !voteDataRows[0].hasOwnProperty(key))) {
             throw new Error(`CSV 檔案缺少必要欄位，請確認包含: ${requiredKeys.join(', ')}`);
         }
@@ -157,6 +204,7 @@ function processVoteData(voteData) {
     villageResults = {}; districtResults = {}; geoKeyToDistrictMap = {};
     const recallDistrictSet = new Set(RECALL_DISTRICTS);
     const filteredVoteData = voteData.filter(row => row.electoral_district_name && recallDistrictSet.has(row.electoral_district_name));
+    
     filteredVoteData.forEach(row => {
         const { electoral_district_name, candidate_name, party_name, votes } = row;
         if (!electoral_district_name) return;
@@ -165,30 +213,38 @@ function processVoteData(voteData) {
         currentVotes.votes += votes || 0;
         districtResults[electoral_district_name].candidates[candidate_name] = currentVotes;
     });
+
     for (const districtName in districtResults) {
         const district = districtResults[districtName];
         const sortedCandidates = Object.entries(district.candidates).sort((a, b) => b[1].votes - a[1].votes);
         if (sortedCandidates.length > 0) { district.winner = sortedCandidates[0][0]; district.winnerParty = sortedCandidates[0][1].party; }
     }
+
     filteredVoteData.forEach(row => {
-        const { geo_key, electoral_district_name, county_name, township_name, village_name, electorate } = row;
+        const { geo_key, electoral_district_name, county_name, township_name, village_name, electorate, total_votes } = row;
         if (!geo_key || !electoral_district_name) return;
         if (!villageResults[geo_key]) {
             const districtWinner = districtResults[electoral_district_name];
             villageResults[geo_key] = {
-                geo_key, fullName: `${county_name} ${township_name} ${village_name}`, districtName: electoral_district_name, electorate: electorate || 0, candidates: [],
-                districtWinnerName: districtWinner ? districtWinner.winner : 'N/A', districtWinnerParty: districtWinner ? districtWinner.winnerParty : 'N/A',
+                geo_key, 
+                fullName: `${county_name} ${township_name} ${village_name}`, 
+                districtName: electoral_district_name, 
+                electorate: electorate || 0,
+                total_votes: total_votes || 0,
+                candidates: [],
+                districtWinnerName: districtWinner ? districtWinner.winner : 'N/A', 
+                districtWinnerParty: districtWinner ? districtWinner.winnerParty : 'N/A',
             };
         }
         villageResults[geo_key].candidates.push({ name: row.candidate_name, party: row.party_name, votes: row.votes || 0 });
         geoKeyToDistrictMap[geo_key] = electoral_district_name;
     });
+
     for (const key in villageResults) {
         const village = villageResults[key];
         village.candidates.sort((a, b) => b.votes - a.votes);
-        const sortedCands = village.candidates;
-        village.leader = sortedCands.length > 0 ? sortedCands[0] : null;
-        village.runnerUp = sortedCands.length > 1 ? sortedCands[1] : null;
+        village.leader = village.candidates.length > 0 ? village.candidates[0] : null;
+        village.runnerUp = village.candidates.length > 1 ? village.candidates[1] : null;
     }
 }
 
@@ -253,6 +309,9 @@ function updateInfoPanel(village, layer) {
     const leaderTurnout = village.electorate > 0 && leader ? (leader.votes / village.electorate * 100).toFixed(2) : 0;
     const runnerUpTurnout = village.electorate > 0 && runnerUp ? (runnerUp.votes / village.electorate * 100).toFixed(2) : 0;
     
+    const nonVoterCount = village.electorate - village.total_votes;
+    const nonVoterRate = village.electorate > 0 ? (nonVoterCount / village.electorate * 100).toFixed(2) : 0;
+
     const existingAnnotation = annotations[village.geo_key]?.note || '';
     const annotationHTML = `
         <div class="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -272,6 +331,19 @@ function updateInfoPanel(village, layer) {
             <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 rounded">
                 <p class="font-bold text-blue-800">選區當選人: ${village.districtWinnerName} (${village.districtWinnerParty})</p>
             </div>
+            
+            <div class="bg-gray-50 border-l-4 border-gray-500 p-3 mb-4 rounded">
+                <p class="font-bold text-gray-800">此村里投票狀況</p>
+                <div class="flex justify-between items-center text-sm text-gray-600 mt-1">
+                    <span>未投票人數 (潛在動員空間)</span>
+                    <span class="font-semibold">${nonVoterCount.toLocaleString()} 人</span>
+                </div>
+                <div class="flex justify-between items-center text-sm text-gray-600">
+                    <span>未投票率</span>
+                    <span class="font-semibold">${nonVoterRate}%</span>
+                </div>
+            </div>
+
             <div class="mb-4">
                 <div class="flex justify-between items-center mb-1"><span class="font-semibold text-gray-700">此村里領先者: ${leader ? leader.name : 'N/A'}</span><span class="text-lg font-bold text-gray-800">${leader ? leader.votes.toLocaleString() : 0} 票</span></div>
                 <div class="flex justify-between items-center text-sm text-gray-600"><span>催票率</span><span>${leaderTurnout}%</span></div>
@@ -445,5 +517,5 @@ function exportToKML() {
         ${kmlPlacemarks}
     </Document>
 </kml>`;
-    downloadFile(kmlContent, 'annotations.kml', 'application/vnd.google-earth.kml+xml');
+    downloadFile(kmlContent, 'application/vnd.google-earth.kml+xml');
 }
