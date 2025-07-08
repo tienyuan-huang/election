@@ -28,7 +28,7 @@
     <div class="flex flex-col md:flex-row h-screen w-screen overflow-hidden">
 
         <!-- 左側地圖區塊 -->
-        <div class="w-full md:w-2/3 h-1/2 md:h-full relative">
+        <div id="map-container" class="w-full md:w-2/3 h-1/2 md:h-full relative transition-all duration-500 ease-in-out">
             <div id="map"></div>
             
             <!-- 控制項面板 -->
@@ -45,10 +45,8 @@
                         <option value="2024" selected>2024 立委選舉</option>
                         <option value="2020">2020 立委選舉</option>
                         <option value="2016">2016 立委選舉</option>
-                        <option value="2012">2012 立委選舉</option>
                     </select>
                 </div>
-                <!-- *** 新增：查看說明按鈕 *** -->
                 <div class="pt-2 mt-1 border-t border-gray-200">
                      <button id="show-help-btn" class="w-full text-sm text-indigo-600 hover:text-indigo-800 hover:underline focus:outline-none text-center">
                         查看操作說明
@@ -66,22 +64,36 @@
         </div>
 
         <!-- 右側資訊區塊 -->
-        <div class="w-full md:w-1/3 h-1/2 md:h-full flex flex-col bg-white shadow-lg overflow-y-auto">
+        <div id="info-container" class="w-full md:w-1/3 h-1/2 md:h-full flex flex-col bg-white shadow-lg overflow-hidden transition-all duration-500 ease-in-out">
             
-            <!-- 選舉資訊面板 -->
-            <div id="info-panel" class="flex-shrink-0">
-                <!-- 內容將由 JavaScript 動態生成 -->
-            </div>
+            <!-- 行動裝置切換鈕 -->
+            <button id="info-toggle" class="md:hidden flex-shrink-0 bg-gray-100 p-2 text-center cursor-pointer border-b border-t border-gray-200 flex items-center justify-center space-x-2 focus:outline-none">
+                <span id="toggle-text" class="text-sm font-medium text-gray-700">收合資訊面板</span>
+                <svg id="toggle-icon-collapse" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+                <svg id="toggle-icon-expand" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                </svg>
+            </button>
 
-            <!-- 標註管理面板 -->
-            <div id="annotation-manager" class="flex-grow p-4 border-t border-gray-200 flex flex-col">
-                <h3 class="text-lg font-bold text-gray-800 mb-2">我的標註</h3>
-                <div class="flex space-x-2 mb-3">
-                    <button id="export-csv-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded text-sm">匯出 CSV</button>
-                    <button id="export-kml-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm">匯出 KML</button>
+            <!-- 可收合內容 -->
+            <div id="collapsible-content" class="flex-grow flex flex-col overflow-y-auto">
+                <!-- 選舉資訊面板 -->
+                <div id="info-panel" class="flex-shrink-0">
+                    <!-- 內容將由 JavaScript 動態生成 -->
                 </div>
-                <div id="annotation-list" class="flex-grow overflow-y-auto bg-gray-50 rounded p-2">
-                    <!-- 標註列表將由 JavaScript 動態生成 -->
+
+                <!-- 標註管理面板 -->
+                <div id="annotation-manager" class="flex-grow p-4 border-t border-gray-200 flex flex-col">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">我的標註</h3>
+                    <div class="flex space-x-2 mb-3">
+                        <button id="export-csv-btn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded text-sm">匯出 CSV</button>
+                        <button id="export-kml-btn" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm">匯出 KML</button>
+                    </div>
+                    <div id="annotation-list" class="flex-grow overflow-y-auto bg-gray-50 rounded p-2">
+                        <!-- 標註列表將由 JavaScript 動態生成 -->
+                    </div>
                 </div>
             </div>
 
@@ -96,6 +108,23 @@
                 <h3 class="text-xl leading-6 font-medium text-gray-900">歡迎使用罷免案選情分析工具</h3>
                 <div class="mt-4 px-4 py-3 text-left text-sm text-gray-700 space-y-4">
                     <p>本地圖工具旨在協助罷免志工，透過視覺化分析各選區近年選舉資料，以利規劃溝通策略與催票範圍。</p>
+                    
+                    <div class="space-y-3">
+                        <p class="font-bold">關鍵指標說明：</p>
+                        <ul class="list-disc list-inside space-y-3">
+                            <li>
+                                催票率：可以想像成是候選人在「<span class="font-semibold">整個村里所有具備投票資格的選民中</span>」獲得了多少支持。
+                                <br>
+                                <span class="text-xs text-gray-600">計算方式：<code>候選人得票數 ÷ 總選舉人數</code>。這個指標的好處是，不管當天投票率高低，我們都能看出候選人在這個地區的「基本盤」實力。</span>
+                            </li>
+                            <li>
+                                未投票率：代表這個村里「<span class="font-semibold">有多少比例的合格選民，沒有出來投票</span>」。
+                                <br>
+                                <span class="text-xs text-gray-600">計算方式：<code>(總選舉人數 - 總投票數) ÷ 總選舉人數</code>。這個數字可以幫助我們了解此地區還有多少潛在的動員空間。</span>
+                            </li>
+                        </ul>
+                    </div>
+
                     <p>
                         地圖顏色代表該村里在該次選舉中的政黨傾向：
                     </p>
@@ -104,9 +133,6 @@
                         <li><span class="pb-0.5 border-b-2 border-red-500">標示紅色區域</span>：代表中國國民黨與主要競爭者之間，催票率差距在 5% 以內，屬於激戰區。</li>
                         <li><span class="pb-0.5 border-b-2 border-green-500">標示綠色區域</span>：代表主要競爭者在該次選舉中，取得 5% 以上的催票率優勢。此處不必然代表該競爭者為民主進步黨籍。</li>
                     </ul>
-                    <p>
-                        此處採用的關鍵指標為「催票率」，其計算方式為「候選人得票數／該區總選舉人數」。相較於「得票率」，此指標更能有效地觀測相同政治勢力在不同年份、不同投票率下的基礎支持度變化。關於催票率的進一步探討，可參考<a href="https://whogovernstw.org/2020/01/17/kohuayap2/" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">此篇文章</a>。
-                    </p>
                 </div>
                 <div class="items-center px-4 py-3">
                     <button id="close-welcome-modal-btn" class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
