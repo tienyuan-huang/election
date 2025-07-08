@@ -32,19 +32,30 @@
             <div id="map"></div>
             
             <!-- 控制項面板 -->
-            <div class="absolute top-4 left-4 bg-white bg-opacity-90 p-3 rounded-lg shadow-lg z-20 flex flex-col space-y-2">
+            <div class="absolute top-4 left-4 bg-white bg-opacity-90 p-3 rounded-lg shadow-lg z-20 flex flex-col space-y-2 max-w-xs">
                 <div>
-                    <label for="district-selector" class="block text-sm font-medium text-gray-700 mb-1">篩選選區</label>
-                    <select id="district-selector" name="district-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <!-- 選項將由 JavaScript 動態生成 -->
-                    </select>
-                </div>
-                <div>
-                    <label for="year-selector" class="block text-sm font-medium text-gray-700 mb-1">選擇年份</label>
+                    <label for="year-selector" class="block text-sm font-medium text-gray-700 mb-1">先選擇年份</label>
                     <select id="year-selector" name="year-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                         <option value="2024" selected>2024 立委選舉</option>
                         <option value="2020">2020 立委選舉</option>
                         <option value="2016">2016 立委選舉</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">搜尋選區或候選人</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="search-input" placeholder="輸入候選人或地區..." class="block w-full pl-3 pr-2 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <button id="clear-search-btn" class="p-2 border border-gray-300 rounded-md bg-white hover:bg-gray-100 text-gray-500" title="清除搜尋">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label for="district-selector" class="block text-sm font-medium text-gray-700 mb-1">篩選選區</label>
+                    <select id="district-selector" name="district-selector" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <!-- 選項將由 JavaScript 動態生成 -->
                     </select>
                 </div>
                 <div class="pt-2 mt-1 border-t border-gray-200">
@@ -116,7 +127,7 @@
                             <li>
                                 <span class="font-semibold">催票率</span>：可以想像成是候選人在「<span class="font-semibold">整個村里所有具備投票資格的選民中</span>」獲得了多少支持。
                                 <br>
-                                <span class="text-xs text-gray-600">計算方式：<code>候選人得票數 ÷ 總選舉人數</code>。這個指標的好處是，不管當天投票率高低，我們都能看出候選人在這個地區的「基本盤」實力。</span>
+                                <span class="text-xs text-gray-600">計算方式：<code>候選人得票數 ÷ 總選舉人數</code>。這個指標的好處是，不管當天投票率高低，我們都能看出候選人在這個地區的「基本盤」實力。關於催票率的進一步探討，可參考<a href="https://whogovernstw.org/2020/01/17/kohuayap2/" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">此篇文章</a>。</span>
                             </li>
                             <li>
                                 <span class="font-semibold">未投票率</span>：代表這個村里「<span class="font-semibold">有多少比例的合格選民，沒有出來投票</span>」。
