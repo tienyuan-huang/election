@@ -1,15 +1,16 @@
 /**
  * @file script.js
  * @description 台灣選舉地圖視覺化工具的主要腳本。
- * @version 16.0.0
+ * @version 17.0.0
  * @date 2025-07-08
- * * 此版本移除了 2012 年的選舉資料。
+ * * 此版本改善了地圖與圖表的著色方案。
  * 主要改進：
- * 1.  **移除 2012 資料**: 從資料來源清單中移除 2012 年的選舉資料。
- * 2.  **更新介面**: 同步更新了年份選擇器，不再顯示 2012 年選項。
+ * 1.  **地圖顏色更新**: 新增民進黨與其他政黨的專屬顏色，使地圖資訊更清晰。
+ * 2.  **圖表顏色更新**: 長條圖現在會根據政黨（國民黨、民進黨、其他）顯示不同顏色。
+ * 3.  **常數定義**: 新增民進黨的政黨名稱常數，方便管理。
  */
 
-console.log('Running script.js version 16.0.0, removed 2012 data.');
+console.log('Running script.js version 17.0.0 with improved color scheme.');
 
 // --- 全域變數與設定 ---
 
@@ -29,7 +30,9 @@ let currentSelectedDistrict = 'all';
 
 let annotations = {};
 
+// *** 新增：定義主要政黨名稱常數 ***
 const KMT_PARTY_NAME = '中國國民黨';
+const DPP_PARTY_NAME = '民主進步黨';
 
 const RECALL_DISTRICTS = [
     '臺東縣第01選區', '臺北市第08選區', '臺北市第07選區', '臺北市第06選區',
@@ -43,7 +46,6 @@ const RECALL_DISTRICTS = [
     '南投縣第02選區', '南投縣第01選區', '花蓮縣第01選區'
 ];
 
-// *** 修改：移除 2012 年的資料來源 ***
 const dataSources = {
     '2024': { votes: 'data/2024/regional_legislator_votes.csv', geo: 'data/village.geojson' },
     '2020': { votes: 'data/2020/regional_legislator_votes.csv', geo: 'data/village.geojson' },
@@ -293,14 +295,26 @@ function populateDistrictFilter() {
     });
 }
 
+// *** 修改：更新地圖著色邏輯 ***
 function getColor(village) {
-    if (!village || !village.leader || !village.runnerUp || !village.electorate) return '#cccccc';
+    if (!village || !village.leader || !village.runnerUp || !village.electorate || village.electorate === 0) {
+        return '#cccccc'; // 無資料或選舉人數為零
+    }
     const leaderTurnout = village.leader.votes / village.electorate;
     const runnerUpTurnout = village.runnerUp.votes / village.electorate;
     const turnoutDiff = Math.abs(leaderTurnout - runnerUpTurnout);
-    if (turnoutDiff < 0.05) return '#ef4444';
-    if (village.leader.party === KMT_PARTY_NAME) return '#3b82f6';
-    return '#16a34a';
+
+    if (turnoutDiff < 0.05) {
+        return '#ef4444'; // 激戰區
+    }
+
+    if (village.leader.party === KMT_PARTY_NAME) {
+        return '#3b82f6'; // 國民黨領先
+    } else if (village.leader.party === DPP_PARTY_NAME) {
+        return '#16a34a'; // 民進黨領先
+    } else {
+        return 'rgba(0, 0, 0, 0.4)'; // 其他政黨/無黨籍領先
+    }
 }
 
 function updateInfoPanel(village, layer) {
@@ -370,6 +384,7 @@ function updateInfoPanel(village, layer) {
     if (voteChart) voteChart.destroy();
     const ctx = document.getElementById('vote-chart').getContext('2d');
     
+    // *** 修改：更新圖表著色邏輯 ***
     voteChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -377,8 +392,16 @@ function updateInfoPanel(village, layer) {
             datasets: [{
                 label: '得票數', 
                 data: village.candidates.map(c => c.votes),
-                backgroundColor: village.candidates.map(c => c.party === KMT_PARTY_NAME ? 'rgba(59, 130, 246, 0.7)' : 'rgba(22, 163, 74, 0.7)'),
-                borderColor: village.candidates.map(c => c.party === KMT_PARTY_NAME ? 'rgba(37, 99, 235, 1)' : 'rgba(21, 128, 61, 1)'),
+                backgroundColor: village.candidates.map(c => {
+                    if (c.party === KMT_PARTY_NAME) return 'rgba(59, 130, 246, 0.7)';
+                    if (c.party === DPP_PARTY_NAME) return 'rgba(22, 163, 74, 0.7)';
+                    return 'rgba(128, 128, 128, 0.7)'; // 其他政黨為灰色
+                }),
+                borderColor: village.candidates.map(c => {
+                    if (c.party === KMT_PARTY_NAME) return 'rgba(37, 99, 235, 1)';
+                    if (c.party === DPP_PARTY_NAME) return 'rgba(21, 128, 61, 1)';
+                    return 'rgba(107, 114, 128, 1)'; // 其他政黨為灰色
+                }),
                 borderWidth: 1
             }]
         },
