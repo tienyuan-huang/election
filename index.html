@@ -58,7 +58,8 @@
             <div class="absolute bottom-4 left-4 bg-white bg-opacity-80 p-3 rounded-lg shadow-lg z-20">
                 <h3 class="font-bold text-sm mb-2">村里政黨傾向</h3>
                 <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #3b82f6;"></div><span class="text-xs">中國國民黨領先</span></div>
-                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #16a34a;"></div><span class="text-xs">非國民黨領先</span></div>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #16a34a;"></div><span class="text-xs">民主進步黨領先</span></div>
+                <div class="flex items-center mb-1"><div class="w-4 h-4 rounded-full mr-2" style="background-color: rgba(0, 0, 0, 0.4);"></div><span class="text-xs">其他政黨/無黨籍領先</span></div>
                 <div class="flex items-center"><div class="w-4 h-4 rounded-full mr-2" style="background-color: #ef4444;"></div><span class="text-xs">激戰區 (催票率差距 &lt; 5%)</span></div>
             </div>
         </div>
@@ -113,12 +114,12 @@
                         <p class="font-bold">關鍵指標說明：</p>
                         <ul class="list-disc list-inside space-y-3">
                             <li>
-                                **催票率**：可以想像成是候選人在「<span class="font-semibold">整個村里所有具備投票資格的選民中</span>」獲得了多少支持。
+                                <span class="font-semibold">催票率</span>：可以想像成是候選人在「<span class="font-semibold">整個村里所有具備投票資格的選民中</span>」獲得了多少支持。
                                 <br>
                                 <span class="text-xs text-gray-600">計算方式：<code>候選人得票數 ÷ 總選舉人數</code>。這個指標的好處是，不管當天投票率高低，我們都能看出候選人在這個地區的「基本盤」實力。</span>
                             </li>
                             <li>
-                                **未投票率**：代表這個村里「<span class="font-semibold">有多少比例的合格選民，沒有出來投票</span>」。
+                                <span class="font-semibold">未投票率</span>：代表這個村里「<span class="font-semibold">有多少比例的合格選民，沒有出來投票</span>」。
                                 <br>
                                 <span class="text-xs text-gray-600">計算方式：<code>(總選舉人數 - 總投票數) ÷ 總選舉人數</code>。這個數字可以幫助我們了解此地區還有多少潛在的動員空間。</span>
                             </li>
@@ -130,8 +131,9 @@
                     </p>
                     <ul class="list-disc list-inside space-y-2">
                         <li><span class="pb-0.5 border-b-2 border-blue-400">標示藍色區域</span>：代表該村里的投票結果由中國國民黨候選人，取得 5% 以上的催票率優勢。</li>
-                        <li><span class="pb-0.5 border-b-2 border-red-500">標示紅色區域</span>：代表中國國民黨與主要競爭者之間，催票率差距在 5% 以內，屬於激戰區。</li>
-                        <li><span class="pb-0.5 border-b-2 border-green-500">標示綠色區域</span>：代表主要競爭者在該次選舉中，取得 5% 以上的催票率優勢。此處不必然代表該競爭者為民主進步黨籍。</li>
+                        <li><span class="pb-0.5 border-b-2 border-green-500">標示綠色區域</span>：代表民主進步黨候選人在該次選舉中，取得 5% 以上的催票率優勢。</li>
+                        <li><span class="pb-0.5 border-b-2 border-gray-500">標示黑色區域</span>：代表其他政黨或無黨籍候選人取得領先。</li>
+                        <li><span class="pb-0.5 border-b-2 border-red-500">標示紅色區域</span>：代表主要競爭者之間，催票率差距在 5% 以內，屬於激戰區。</li>
                     </ul>
                 </div>
                 <div class="items-center px-4 py-3">
