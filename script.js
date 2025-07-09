@@ -1,16 +1,16 @@
 /**
  * @file script.js
  * @description 台灣選舉地圖視覺化工具的主要腳本。
- * @version 18.0.0
- * @date 2025-07-08
- * * 此版本新增了選區搜尋功能。
+ * @version 20.0.0
+ * @date 2025-07-10
+ * * 此版本優化了地圖載入效能，改為讓使用者手動選擇選區後才載入地圖資料，避免開啟時因載入全台資料而過於緩慢。
  * 主要改進：
- * 1.  **新增搜尋功能**: 使用者可透過關鍵字搜尋候選人或行政區，快速篩選選區列表。
- * 2.  **建立搜尋索引**: 資料處理流程中會建立一個包含多種關鍵字的搜尋索引。
- * 3.  **介面更新**: 新增搜尋輸入框，並讓選區下拉選單能根據搜尋結果即時更新。
+ * 1.  **延後地圖渲染**：網頁啟動時不再自動繪製所有選區，需由使用者手動選擇。
+ * 2.  **引導式選單**：下拉選單預設為提示訊息，引導使用者操作。
+ * 3.  **明確警告**：在全選選項中加入「讀取較久」的提示文字。
  */
 
-console.log('Running script.js version 18.0.0 with search functionality.');
+console.log('Running script.js version 20.0.0 with deferred map loading.');
 
 // --- 全域變數與設定 ---
 
@@ -21,14 +21,17 @@ let voteChart = null;
 
 let infoToggle, infoContainer, mapContainer, collapsibleContent, toggleText, toggleIconCollapse, toggleIconExpand;
 
-// 新增：搜尋功能相關 DOM 元素
+// 搜尋功能相關 DOM 元素
 let searchInput, clearSearchBtn;
 
 let currentGeoData = null;
 let villageResults = {}; 
 let districtResults = {}; 
 let geoKeyToDistrictMap = {};
-let currentSelectedDistrict = 'all'; 
+let currentSelectedDistrict = 'none'; // 預設為未選擇
+
+// 儲存 2024 年各選區當選人的物件
+let winners2024 = {};
 
 let annotations = {};
 
@@ -55,7 +58,7 @@ const dataSources = {
 
 // --- 初始化與事件監聽 ---
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     infoPanel = document.getElementById('info-panel');
     yearSelector = document.getElementById('year-selector');
     districtSelector = document.getElementById('district-selector');
@@ -72,13 +75,16 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleIconCollapse = document.getElementById('toggle-icon-collapse');
     toggleIconExpand = document.getElementById('toggle-icon-expand');
 
-    // 獲取搜尋相關元素
     searchInput = document.getElementById('search-input');
     clearSearchBtn = document.getElementById('clear-search-btn');
 
     initializeMap();
     setupEventListeners();
     checkAndShowWelcomeModal();
+    
+    await load2024Winners();
+    
+    // 載入初始年份資料，但不繪製地圖
     loadAndDisplayYear(yearSelector.value);
     renderAnnotationList();
 });
@@ -92,11 +98,15 @@ function initializeMap() {
 }
 
 function setupEventListeners() {
+    // *** 修改：只有當使用者選擇有效選區時才觸發地圖渲染 ***
     districtSelector.addEventListener('change', (e) => {
+        if (e.target.value === 'none') return; // 如果選擇的是提示文字，則不執行任何動作
+
         currentSelectedDistrict = e.target.value;
         renderMapLayers();
         resetInfoPanel();
     });
+
     yearSelector.addEventListener('change', (e) => loadAndDisplayYear(e.target.value));
     exportCsvBtn.addEventListener('click', exportToCSV);
     exportKmlBtn.addEventListener('click', exportToKML);
@@ -116,7 +126,6 @@ function setupEventListeners() {
         infoToggle.addEventListener('click', toggleInfoPanel);
     }
 
-    // *** 新增：搜尋功能的事件監聽 ***
     searchInput.addEventListener('input', handleSearch);
     clearSearchBtn.addEventListener('click', clearSearch);
 }
@@ -130,20 +139,26 @@ function handleSearch() {
     }
 
     const matchedDistricts = RECALL_DISTRICTS.filter(districtName => {
+        const winnerName = winners2024[districtName] || '';
+        const searchableString = `${districtName} ${winnerName}`.toLowerCase();
+        
         const districtData = districtResults[districtName];
-        return districtData && districtData.searchableString.toLowerCase().includes(query);
+        const fullSearchableString = districtData ? districtData.searchableString.toLowerCase() : '';
+
+        return searchableString.includes(query) || fullSearchableString.includes(query);
     });
 
     populateDistrictFilter(matchedDistricts);
-    // 自動觸發 change 事件以更新地圖
-    districtSelector.dispatchEvent(new Event('change'));
+    // *** 移除：不再自動觸發地圖更新，讓使用者手動選擇 ***
+    // districtSelector.dispatchEvent(new Event('change'));
 }
 
 function clearSearch() {
     searchInput.value = '';
     populateDistrictFilter();
-    districtSelector.value = 'all'; // 重設為顯示全部
-    districtSelector.dispatchEvent(new Event('change'));
+    districtSelector.value = 'none'; 
+    currentSelectedDistrict = 'none';
+    clearUI();
 }
 
 
@@ -200,12 +215,53 @@ function checkAndShowWelcomeModal() {
     }
 }
 
+// 載入 2024 年當選人資料的函式
+async function load2024Winners() {
+    console.log('正在載入 2024 年當選人資料...');
+    try {
+        const voteDataRows = await new Promise((resolve, reject) => {
+            Papa.parse(dataSources['2024'].votes, {
+                download: true, header: true, dynamicTyping: true, skipEmptyLines: true,
+                complete: res => res.errors.length ? reject(res.errors[0]) : resolve(res.data),
+                error: err => reject(new Error(`無法讀取 2024 CSV: ${err.message}`))
+            });
+        });
+
+        const tempDistrictResults = {};
+        const recallDistrictSet = new Set(RECALL_DISTRICTS);
+        const filteredVoteData = voteDataRows.filter(row => row.electoral_district_name && recallDistrictSet.has(row.electoral_district_name));
+
+        filteredVoteData.forEach(row => {
+            const { electoral_district_name, candidate_name, party_name, votes } = row;
+            if (!electoral_district_name) return;
+
+            if (!tempDistrictResults[electoral_district_name]) {
+                tempDistrictResults[electoral_district_name] = { candidates: {} };
+            }
+            const currentVotes = tempDistrictResults[electoral_district_name].candidates[candidate_name] || { votes: 0, party: party_name };
+            currentVotes.votes += votes || 0;
+            tempDistrictResults[electoral_district_name].candidates[candidate_name] = currentVotes;
+        });
+
+        for (const districtName in tempDistrictResults) {
+            const district = tempDistrictResults[districtName];
+            const sortedCandidates = Object.entries(district.candidates).sort((a, b) => b[1].votes - a[1].votes);
+            if (sortedCandidates.length > 0) {
+                winners2024[districtName] = sortedCandidates[0][0];
+            }
+        }
+        console.log('2024年立委當選人資料載入成功。');
+    } catch (error) {
+        console.error("載入2024年當選人資料時發生錯誤:", error);
+    }
+}
+
 
 // --- 主要資料處理函式 ---
 async function loadAndDisplayYear(year) {
     const source = dataSources[year];
     if (!source) return console.error(`找不到 ${year} 年的資料來源設定。`);
-    clearUI();
+    
     setLoadingState(true);
     try {
         const [geoData, voteDataRows] = await Promise.all([
@@ -227,8 +283,12 @@ async function loadAndDisplayYear(year) {
             throw new Error(`CSV 檔案缺少必要欄位，請確認包含: ${requiredKeys.join(', ')}`);
         }
         processVoteData(voteDataRows);
-        populateDistrictFilter(); // 使用完整列表初始化
-        renderMapLayers();
+        populateDistrictFilter(); 
+        
+        // *** 修改：載入資料後，不再自動渲染地圖，而是清空UI並等待使用者選擇 ***
+        currentSelectedDistrict = 'none';
+        clearUI();
+
     } catch (error) {
         console.error(`[錯誤] 處理 ${year} 年資料時發生嚴重錯誤:`, error);
         infoPanel.innerHTML = `<div class="p-4"><h2 class="text-2xl font-bold text-red-600">資料處理失敗</h2><p class="text-gray-500 mt-2">請按 F12 打開開發者工具查看詳細錯誤訊息。</p><p class="text-gray-600 mt-1 text-sm bg-red-50 p-2 rounded">${error.message}</p></div>`;
@@ -242,20 +302,17 @@ function processVoteData(voteData) {
     const recallDistrictSet = new Set(RECALL_DISTRICTS);
     const filteredVoteData = voteData.filter(row => row.electoral_district_name && recallDistrictSet.has(row.electoral_district_name));
     
-    // *** 新增：建立行政區和候選人的索引 ***
-    const districtTownships = {}; // e.g. { "臺北市第01選區": Set("士林區", "北投區") }
+    const districtTownships = {};
 
     filteredVoteData.forEach(row => {
         const { electoral_district_name, candidate_name, party_name, votes, township_name } = row;
         if (!electoral_district_name) return;
 
-        // 建立選區-行政區對照
         if (!districtTownships[electoral_district_name]) {
             districtTownships[electoral_district_name] = new Set();
         }
         districtTownships[electoral_district_name].add(township_name);
 
-        // 累計候選人票數
         if (!districtResults[electoral_district_name]) {
             districtResults[electoral_district_name] = { candidates: {} };
         }
@@ -264,16 +321,13 @@ function processVoteData(voteData) {
         districtResults[electoral_district_name].candidates[candidate_name] = currentVotes;
     });
 
-    // *** 新增：為每個選區建立可搜尋的字串 ***
     for (const districtName in districtResults) {
         const district = districtResults[districtName];
         const candidatesString = Object.keys(district.candidates).join(' ');
         const townshipsString = Array.from(districtTownships[districtName] || []).join(' ');
-        // searchableString 包含：選區名、行政區名、候選人名
         district.searchableString = `${districtName} ${townshipsString} ${candidatesString}`;
     }
 
-    // (其餘處理邏輯不變)
     for (const districtName in districtResults) {
         const district = districtResults[districtName];
         const sortedCandidates = Object.entries(district.candidates).sort((a, b) => b[1].votes - a[1].votes);
@@ -314,9 +368,8 @@ function processVoteData(voteData) {
 function renderMapLayers() {
     if (geoJsonLayer) map.removeLayer(geoJsonLayer);
     
-    // 根據選區選擇器決定要顯示哪些村里
     const selectedDistrict = districtSelector.value;
-    const isMultiSelect = districtSelector.options.length > 2 && selectedDistrict === 'all';
+    const isMultiSelect = selectedDistrict === 'all';
 
     geoJsonLayer = L.geoJSON(currentGeoData, {
         filter: feature => {
@@ -325,11 +378,10 @@ function renderMapLayers() {
             if (!districtName) return false;
 
             if (isMultiSelect) {
-                // 如果是多選模式（搜尋結果），則顯示所有符合的選區
+                // 如果是 "all"，則顯示所有在下拉選單中的選區（搜尋結果或全部）
                 return Array.from(districtSelector.options).some(opt => opt.value === districtName);
             } else {
-                // 單選或預設的 "all" 模式
-                return selectedDistrict === "all" || districtName === selectedDistrict;
+                return districtName === selectedDistrict;
             }
         },
         style: feature => {
@@ -359,39 +411,39 @@ function renderMapLayers() {
     }
 }
 
-// *** 修改：讓此函式可以接受要顯示的選區列表 ***
+// *** 修改：更新下拉選單的產生方式 ***
 function populateDistrictFilter(districtsToShow = RECALL_DISTRICTS) {
-    const originalValue = districtSelector.value;
+    const isSearchResult = searchInput.value.trim().length > 0;
     districtSelector.innerHTML = ''; // 清空現有選項
 
-    // 根據傳入的列表長度決定是否顯示 "所有..." 選項
-    if (districtsToShow.length > 1) {
+    // 1. 新增預設的提示選項
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = "none";
+    placeholderOption.textContent = "— 請先選擇一個選區 —";
+    placeholderOption.disabled = true;
+    placeholderOption.selected = true;
+    districtSelector.appendChild(placeholderOption);
+
+    // 2. 新增 "全部顯示" 選項，並附上警告
+    if (districtsToShow.length > 0) {
         const allOption = document.createElement('option');
         allOption.value = "all";
-        allOption.textContent = `所有符合的選區 (${districtsToShow.length})`;
+        allOption.textContent = isSearchResult 
+            ? `顯示所有 ${districtsToShow.length} 個搜尋結果` 
+            : "顯示所有選區 (讀取較久)";
         districtSelector.appendChild(allOption);
-    } else if (districtsToShow.length === 0) {
-        const noResultOption = document.createElement('option');
-        noResultOption.value = "none";
-        noResultOption.textContent = "無符合的選區";
-        districtSelector.appendChild(noResultOption);
     }
 
-    // 填充選區選項
+    // 3. 填充所有可選的選區
     districtsToShow.sort((a, b) => a.localeCompare(b, 'zh-Hant')).forEach(districtName => {
         const option = document.createElement('option');
         option.value = districtName;
-        option.textContent = districtName;
+        const winnerName = winners2024[districtName] || '';
+        option.textContent = winnerName ? `${districtName}：${winnerName}` : districtName;
         districtSelector.appendChild(option);
     });
-
-    // 嘗試還原之前的選項，如果還存在的話
-    if (Array.from(districtSelector.options).some(opt => opt.value === originalValue)) {
-        districtSelector.value = originalValue;
-    } else if (districtsToShow.length === 1) {
-        // 如果只有一個結果，就直接選取它
-        districtSelector.value = districtsToShow[0];
-    }
+    
+    districtSelector.value = 'none';
 }
 
 
@@ -516,9 +568,10 @@ function updateInfoPanel(village, layer) {
     });
 }
 
+// *** 修改：更新初始面板的提示文字 ***
 function resetInfoPanel() {
     if (voteChart) { voteChart.destroy(); voteChart = null; }
-    infoPanel.innerHTML = `<div class="p-4"><h2 class="text-2xl font-bold text-gray-800">請選擇一個村里</h2><p class="text-gray-500">點擊地圖上的區塊來查看該村里的詳細選舉資料與新增標註。</p></div>`;
+    infoPanel.innerHTML = `<div class="p-4"><h2 class="text-2xl font-bold text-gray-800">開始分析</h2><p class="text-gray-500 mt-2">請從左上方的下拉選單選擇一個選區，地圖將會顯示該選區的詳細資料。</p></div>`;
 }
 
 function clearUI() {
